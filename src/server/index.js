@@ -55,6 +55,8 @@ app.use((req, res) => {
 
 if (statics) {
   const palantirFile = JSON.parse(fs.readFileSync(`${statics}/palantir.json`, 'utf8'));
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = palantirFile.variables['gapi-credentials-path'];
+
   const slackToken = palantirFile.variables['slack-token'];
   if (slackToken) {
     const rtm = new RTMClient(slackToken);
@@ -62,14 +64,25 @@ if (statics) {
     const registerSlack = async (apps) => {
       await rtm.start();
       rtm.on('message', ({ text, user, channel }) => {
-        if (text === 'palantir help') {
-          rtm.sendMessage(`<@${user}>, voici les commandes disponibles: ${
-            apps.map(command => `\n- \`${command}\``)
-            }`, channel);
-        } else if (apps.includes(text)) {
-          io.emit(text);
-          rtm.sendMessage('C\'est parti !!', channel);
+        if (!text) {
+          return;
         }
+        
+        const [command, parameters] = text.split(/ (.*)/).filter( e => e.length > 1);
+
+        if (apps.indexOf(command) === -1) {
+          if (command === 'help') {
+            rtm.sendMessage(`<@${user}>, voici les commandes disponibles: ${
+              apps.map(command => `\n- \`${command}\``)
+                }`, channel);
+            }
+            
+          return;
+        }
+        console.log(`> command: ${command}`);
+        console.log(`> parameters: ${parameters}`);
+        io.emit(command, parameters);
+        rtm.sendMessage('C\'est parti !!', channel);
       });
     }
 
